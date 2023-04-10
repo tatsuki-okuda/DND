@@ -11,6 +11,7 @@ td {
 }
 
 
-tr.ghost {
+tr.ghost,
+th.ghost {
   opacity: 0.2;
 }

@@ -4,9 +4,14 @@ import React, { cloneElement, useCallback, useEffect, useMemo, useRef, useState 
  * 配列の要素を移動させる
  */
 const moveItem = <T = any>( arr: T[], currentIndex: number, targetIndex: number) =>  {
-  const cloneArr = [...arr];
-  [cloneArr[currentIndex], cloneArr[targetIndex]] = [arr[targetIndex], arr[currentIndex]];
-  return cloneArr;
+  // const cloneArr = [...arr];
+  // [cloneArr[currentIndex], cloneArr[targetIndex]] = [arr[targetIndex], arr[currentIndex]];
+  // return cloneArr;
+
+  const targetItem = arr[currentIndex];
+  let resArr = arr.map((target, i) => (i === currentIndex ? null : target));
+  resArr.splice(targetIndex, 0, targetItem);
+  return resArr.flatMap((target) => (target !== null ? [target] : []));
 };
 
 export type Item = {
@@ -31,26 +36,27 @@ type HandleProps = {
   onDragEnd?: (event: React.DragEvent) => void;
 };
 
-type ItemViewParams = {
-  item: Item;
+type ItemViewParams<T> = {
+  item: T;
   index: () => number;
   handleProps: HandleProps;
   itemProps: ItemProps;
 };
 
-type GhostViewParams = {
-  item: Item;
+type GhostViewParams<T> = {
+  item: T;
   ghostProps: Omit<ItemProps, "ref">;
 };
 
-type Props = {
-  initItems: Item[];
+type Props<T> = {
+  initItems: T[];
+  primaryKey: keyof T;
   direction?: "vertical" | "horizontal";
-  onChange?: (newItems: Item[]) => void;
+  onChange?: (newItems: T[]) => void;
   // ReactNodeではなくメソッドを受け取る
   // 必須にすることで何が必要か一目でわかる
-  children: (params: ItemViewParams) => JSX.Element;
-  ghost?: (params: GhostViewParams) => JSX.Element;
+  children: (params: ItemViewParams<T>) => JSX.Element;
+  ghost?: (params: GhostViewParams<T>) => JSX.Element;
 };
 
 const initialIndex = -1;
@@ -62,15 +68,16 @@ const initialIndex = -1;
  * @param {Props} { initItems, onChange } 
  * @returns {JSX.Element}
  */
-const Dnd2 = ({
+const Dnd2 = <T,>({
   initItems,
+  primaryKey,
   direction = "vertical",
   onChange = () => {},
   children: itemViewFn,
   ghost: ghostView = () => <></>
-}: Props):JSX.Element => {
+}: Props<T>):JSX.Element => {
   // リストデータ
-  const [items, setItems] = useState(initItems);
+  const [items, setItems] = useState<T[]>(initItems);
 
   // リストのイメージ
   const $refs = useRef(new Map<string, HTMLElement>());
@@ -106,33 +113,33 @@ const Dnd2 = ({
    */
   const getIndex = useCallback(
     (itemId: string | null): number => {
-      return items.findIndex((item) => item.id === itemId);
+      return items.findIndex((item) => item[primaryKey] as string === itemId);
     },
-    [items]
+    [items,primaryKey]
   );
 
 
   /**
    * ドラッグを開始する要素に設定するpropsを生成する
    * @function
-   * @param {Item} item 
+   * @param {T} item 
    * @returns HandleProps
    */
-  const getHandleProps = (item: Item): HandleProps => {
+  const getHandleProps = (item: T): HandleProps => {
     return {
       draggable: true,
       onDragStart(event) {
         // activeIdの更新
-        setActiveId(item.id);
-        $activeId.current = item.id;
+        setActiveId(item[primaryKey] as string);
+        $activeId.current = item[primaryKey] as string;
 
         // ドラッグデータの設定
-        event.dataTransfer.setData("text/plain", item.id);
+        event.dataTransfer.setData("text/plain", item[primaryKey] as string);
         event.dataTransfer.dropEffect = "move";
         event.dataTransfer.effectAllowed = "move";
 
         // ドラッグ時に表示される画像(要素)を設定
-        const elm = $refs.current.get(item.id);
+        const elm = $refs.current.get(item[primaryKey] as string);
         if (elm) {
           const rect = elm.getBoundingClientRect(); //要素の寸法と、そのビューポートに対する相対位置
           const posX = event.clientX - rect.left;
@@ -142,8 +149,8 @@ const Dnd2 = ({
       },
       onDragEnd(event) {
         // ドラッグスタートした時のidとエンドの時のidが一致するか
-        if ($activeId.current === item.id) {
-          const activeIndex = getIndex(item.id);
+        if ($activeId.current === item[primaryKey] as string) {
+          const activeIndex = getIndex(item[primaryKey] as string);
           // 有効なindexの範囲なら置き換える
           if (activeIndex >= 0 && $targetIndex.current >= 0) {
             const newItems = moveItem(items, activeIndex, $targetIndex.current);
@@ -164,13 +171,13 @@ const Dnd2 = ({
   /**
    * ドラッグ先の要素に設定するpropsを生成する
    * @function
-   * @param {Item} item 
+   * @param {T} item 
    * @returns {ItemProps}
    */
-  const getItemProps = (item: Item): ItemProps => {
+  const getItemProps = (item: T): ItemProps => {
     return {
-      key: item.id,
-      ref: (elm) => setElm(item.id, elm),
+      key: item[primaryKey] as string,
+      ref: (elm) => setElm(item[primaryKey] as string, elm),
       onDragEnter(event) {
         event.preventDefault();
       },
@@ -182,8 +189,8 @@ const Dnd2 = ({
       },
       onDragOver(event) {
         event.preventDefault();
-        const elm = $refs.current.get(item.id);
-        const i = getIndex(item.id);
+        const elm = $refs.current.get(item[primaryKey] as string);
+        const i = getIndex(item[primaryKey] as string);
         // HTMLElementの存在確認
         if (!elm || i < 0) return;
 
@@ -206,7 +213,7 @@ const Dnd2 = ({
    * @function
    * @returns {GhostViewParams}
    */
-  const getGhostProps = (): GhostViewParams["ghostProps"] => {
+  const getGhostProps = (): GhostViewParams<T>["ghostProps"] => {
     return {
       key: "__ghost__",
       onDragEnter(event) {
@@ -231,7 +238,7 @@ const Dnd2 = ({
     return items.map((item) => {
       return itemViewFn({
         item,
-        index: () => items.findIndex((target) => target.id === item.id),
+        index: () => items.findIndex((target) => target[primaryKey] === item[primaryKey]),
         handleProps: getHandleProps(item),
         itemProps: getItemProps(item)
       });
