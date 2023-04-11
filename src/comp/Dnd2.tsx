@@ -31,7 +31,7 @@ type ItemProps = {
 };
 
 type HandleProps = {
-  draggable: true;
+  draggable: boolean;
   onDragStart?: (event: React.DragEvent) => void;
   onDragEnd?: (event: React.DragEvent) => void;
 };
@@ -51,6 +51,7 @@ type GhostViewParams<T> = {
 type Props<T> = {
   initItems: T[];
   primaryKey: keyof T;
+  draggable?: boolean;
   direction?: "vertical" | "horizontal";
   onChange?: (newItems: T[]) => void;
   // ReactNodeではなくメソッドを受け取る
@@ -71,6 +72,7 @@ const initialIndex = -1;
 const Dnd2 = <T,>({
   initItems,
   primaryKey,
+  draggable = true,
   direction = "vertical",
   onChange = () => {},
   children: itemViewFn,
@@ -127,7 +129,7 @@ const Dnd2 = <T,>({
    */
   const getHandleProps = (item: T): HandleProps => {
     return {
-      draggable: true,
+      draggable: draggable,
       onDragStart(event) {
         // activeIdの更新
         setActiveId(item[primaryKey] as string);
@@ -244,7 +246,7 @@ const Dnd2 = <T,>({
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, itemViewFn]);
+  }, [items, itemViewFn, draggable]);
 
 
   /**
@@ -269,6 +271,7 @@ const Dnd2 = <T,>({
         });
 
         if (i - activeIndex >= 2 || i - activeIndex < 0) {
+          if(items[activeIndex] == null){ return [viewWithAttr]; }
           // 移動可能な位置ならゴーストと一緒に返す
           const ghost = ghostView({
             item: items[activeIndex],
@@ -280,6 +283,7 @@ const Dnd2 = <T,>({
       }
 
       if (i + 1 === items.length && i + 1 === targetIndex) {
+        if(items[activeIndex] == null){ return [view]; }
         // targetIndexが末尾ならゴーストと一緒に返す
         const ghost = ghostView({
           item: items[activeIndex],
